@@ -1,0 +1,204 @@
+# Creating a single Scilab script with solutions for Q1, Q2 and Q3 and saving it to /mnt/data
+script = r"""
+// metodos_ufrn_av1.sci
+// Autor: Ives (estilo personalizado)
+// Disciplina: Métodos Computacionais em Engenharia (DCA0304 - UFRN)
+// Conteúdo: Questão 1 (Eliminação de Gauss com pivoteamento parcial),
+//          Questão 2 (Ajuste por mínimos quadrados - polinômio grau 4),
+//          Questão 3 (Newton-Raphson para ângulo de disparo α).
+// Como usar: abra o Scilab, navegue até a pasta deste arquivo e execute: exec('metodos_ufrn_av1.sci');
+
+// --------------------------- Questão 1 ---------------------------------
+// Análise nodal com triangularização de Gauss (com pivoteamento parcial)
+// Dados conforme relatório recebido.
+disp("==== Questao 1: Eliminacao de Gauss (pivoteamento parcial) ====")
+
+// Definição da matriz de condutâncias G e vetor de correntes I
+G = [1.5, -0.5, 0,    0;
+     -0.5, 1.5, -0.5, 0;
+      0,  -0.5, 1.625, -0.5;
+      0,   0,   -0.5,  0.6];
+
+I = [35; -10; 0; 2];
+
+// Monta matriz aumentada [G | I]
+A = [G I];
+[n, h] = size(A);
+
+// Função local: eliminação de Gauss com pivoteamento parcial
+function x = gauss_partial(A)
+    [n, h] = size(A);
+    m = n; // número de equações
+    for k = 1:m-1
+        // Encontrar o pivô (maior valor absoluto na coluna k, abaixo de k)
+        [maxval, maxidx_rel] = max(abs(A(k:m, k)));
+        maxidx = maxidx_rel + k - 1;
+        if maxidx ~= k then
+            // troca de linhas
+            tmp = A(k, :);
+            A(k, :) = A(maxidx, :);
+            A(maxidx, :) = tmp;
+        end
+        pivot = A(k,k);
+        if abs(pivot) < %eps then
+            error("Pivô nulo ou muito pequeno - sistema pode ser singular ou mal condicionado");
+        end
+        // Eliminação
+        for i = k+1:m
+            factor = A(i,k) / pivot;
+            A(i, k:h) = A(i, k:h) - factor * A(k, k:h);
+        end
+    end
+    // Substituição retroativa
+    x = zeros(m,1);
+    x(m) = A(m, m+1) / A(m, m);
+    for i = m-1:-1:1
+        s = sum(A(i, i+1:m) .* x(i+1:m)');
+        x(i) = (A(i, m+1) - s) / A(i, i);
+    end
+endfunction
+
+V = gauss_partial(A);
+disp("Tensoes nodais (V):");
+disp(V);
+
+// Salvar resultado em arquivo texto
+txtwrite("questao1_tensoes.txt", V);
+xs2png(0, "questao1_tensoes.png"); // salva figura vazia (caso queira plotar depois)
+
+// Plot simples das tensões nodais
+clf();
+plot(V, 'o-');
+xtitle("Questao 1: Tensoes nodais", "no", "tensao (V)");
+xgrid();
+xs2png(0, "questao1_plot.png");
+
+// --------------------------- Questão 2 ---------------------------------
+// Ajuste por mínimos quadrados: polinômio de grau 4
+disp("==== Questao 2: Ajuste polinomial (grau 4) - Minimos quadrados ====")
+
+// Se você tiver um arquivo com dados, nomeie como "q2_data.txt" com duas colunas (V I).
+// Se não houver, usamos um conjunto de dados de exemplo (substitua pelos seus dados reais).
+if fileexists("q2_data.txt") then
+    data = csvRead("q2_data.txt", " ");
+    Vdata = data(:,1);
+    Idata = data(:,2);
+    disp("Dados lidos de q2_data.txt (colunas: V I)");
+else
+    // Dados de exemplo para demonstrar o ajuste (tensão V vs corrente I)
+    Vdata = [0; 50; 100; 150; 200; 250; 300]; // em V (exemplo)
+    Idata = [0.1; 0.9; 3.2; 6.5; 11.0; 16.8; 24.0]; // em A (exemplo)
+    disp("Arquivo q2_data.txt nao encontrado. Usando dados de exemplo (substitua pelos dados reais).");
+end
+
+// Ajuste polinomial de grau 4
+grau = 4;
+p = polyfit(Vdata, Idata, grau); // coeficientes do polinômio (maior grau primeiro)
+disp("Coeficientes do polinomio (maior grau --> termo constante):");
+disp(p');
+
+// Função para avaliar polinômio
+function y = eval_poly(p, x)
+    y = polyval(p, x);
+endfunction
+
+// Plot do ajuste
+clf();
+xx = linspace(min(Vdata), max(Vdata), 200);
+yy = eval_poly(p, xx);
+plot(Vdata, Idata, 'o', xx, yy, '-');
+xtitle("Questao 2: Ajuste polinomial grau 4", "Tensao (V)", "Corrente (A)");
+legend(["dados medidos", "ajuste polinomial"], "in_upper_right");
+xgrid();
+xs2png(0, "questao2_ajuste.png");
+
+// Estimar a corrente para uma tensão nominal (substitua pelo valor real se conhecido)
+V_nominal = 127; // exemplo: 127 V. Altere conforme necessário.
+I_est = eval_poly(p, V_nominal);
+mprintf("Estimativa de corrente para V_nominal = %.3f V : I = %.6f A\n", V_nominal, I_est);
+mprintf("Coeficientes do ajuste: ");
+disp(p');
+
+// Salvar resultados
+txtwrite("questao2_coeficientes.txt", p);
+txtwrite("questao2_estimativa.txt", [V_nominal; I_est]);
+
+// --------------------------- Questão 3 ---------------------------------
+// Newton-Raphson para encontrar ângulo de disparo alpha
+disp("==== Questao 3: Newton-Raphson para angulo de disparo alpha ====")
+
+// Dados conforme relatório
+QCN = 50; // MVAr (capacitor bank)
+QLN = 20; // MVAr (inductor bank)
+Qs = [50, 45, 40, 35, 30]; // MVAr - potencias desejadas (exemplo do relatório)
+
+// Função Q(alpha) conforme documento: Qij = QCN - QLN/pi * [2*(pi - alpha) + sin(2*alpha)]
+function f = Q_of_alpha(alpha, Qd)
+    // Recebe alpha em radianos e retorna f(alpha) = Q(alpha) - Qdesejado
+    f = QCN - (QLN / %pi) * (2 * (%pi - alpha) + sin(2*alpha)) - Qd;
+endfunction
+
+// Derivada f'(alpha)
+function df = dQ_of_alpha(alpha)
+    df = (QLN / %pi) * (2 - 2 * cos(2*alpha));
+endfunction
+
+// Implementação de Newton-Raphson robusta
+function alpha = newton_alpha(Qdesejado)
+    tol = 1e-8;
+    max_iter = 200;
+    alpha = %pi/4; // chute inicial (45 graus)
+    for k = 1:max_iter
+        fval = Q_of_alpha(alpha, Qdesejado);
+        dfval = dQ_of_alpha(alpha);
+        if abs(dfval) < 1e-12 then
+            error("Derivada muito pequena — possivel ponto singular. Abortando.");
+        end
+        alpha_new = alpha - fval / dfval;
+        // projetar alpha para intervalo [0, pi] fisicamente válido
+        if alpha_new < 0 then alpha_new = 0; end
+        if alpha_new > %pi then alpha_new = %pi; end
+        if abs(alpha_new - alpha) < tol then
+            alpha = alpha_new;
+            return;
+        end
+        alpha = alpha_new;
+    end
+    warning("Newton nao convergiu dentro do numero maximo de iteracoes.");
+endfunction
+
+// Calcular para cada Qs
+alphas_rad = zeros(length(Qs),1);
+alphas_deg = zeros(length(Qs),1);
+for i = 1:length(Qs)
+    alphas_rad(i) = newton_alpha(Qs(i));
+    alphas_deg(i) = alphas_rad(i) * 180 / %pi;
+    mprintf("Qs = %g MVAr -> alpha = %.6f rad = %.6f graus\n", Qs(i), alphas_rad(i), alphas_deg(i));
+end
+
+// Salvar resultados
+txtwrite("questao3_alphas_deg.txt", alphas_deg);
+txtwrite("questao3_alphas_rad.txt", alphas_rad);
+
+// Plot alpha vs Qs
+clf();
+plot(Qs, alphas_deg, 'o-');
+xtitle("Questao 3: Angulo de disparo alpha vs Q desejado", "Q desejado (MVAr)", "alpha (graus)");
+xgrid();
+xs2png(0, "questao3_alpha_vs_Q.png");
+
+disp("==== FIM DO SCRIPT ====");
+"""
+
+# write the script to file
+path = "/mnt/data/metodos_ufrn_av1.sci"
+with open(path, "w", encoding="utf-8") as f:
+    f.write(script)
+
+# show a short preview for the user and provide the download path
+print("Arquivo criado em:", path)
+print("\nTrecho inicial do arquivo:\n")
+with open(path, "r", encoding="utf-8") as f:
+    preview = "".join([next(f) for _ in range(40)])
+print(preview)
+
