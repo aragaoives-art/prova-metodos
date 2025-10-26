@@ -1,0 +1,108 @@
+"""
+QUESTÃO 1 - CÁLCULO DE COMPENSAÇÃO REATIVA
+"""
+
+def f(Qs):
+    """f(Qs) = 0,160·Qs² + 78,44·Qs + 491,98"""
+    return 0.160 * Qs**2 + 78.44 * Qs + 491.98
+
+def df(Qs):
+    """f'(Qs) = 0,320·Qs + 78,44"""
+    return 0.320 * Qs + 78.44
+
+def newton_raphson(xi, tol=1e-5, tmax=100):
+    """
+    
+    xi+1 = xi - f(xi)/f'(xi)
+    Se f(x) = 0 ou f(x) < ε então x é a raiz, ou, se t > tmax, parar
+    """
+    print(" MÉTODO DE NEWTON-RAPHSON ")
+    print("Fórmula: xi+1 = xi - f(xi)/f'(xi)")
+    print("Critério: f(x) = 0 ou f(x) < ε ou t > tmax")
+    print("=" * 50)
+    
+    x = xi
+    print(f"x⁰ = {x}")
+    print(f"ε = {tol}")
+    print(f"tmax = {tmax}")
+    
+    for t in range(tmax):
+        # Calcular f(xi) e f'(xi)
+        fxi = f(x)
+        dfxi = df(x)
+        
+        # APLICAR FÓRMULA: xi+1 = xi - f(xi)/f'(xi)
+        x_proximo = x - fxi / dfxi
+        
+        # Calcular f(xi+1) para critério de parada
+        fx_proximo = f(x_proximo)
+        
+        print(f"\nIteração t = {t}")
+        print(f"x{t} = {x:.6f}")
+        print(f"f(x{t}) = {fxi:.6f}")
+        print(f"f'(x{t}) = {dfxi:.6f}")
+        print(f"x{t+1} = {x_proximo:.6f}")
+        print(f"f(x{t+1}) = {fx_proximo:.6f}")
+        
+        # CRITÉRIO DE PARADA: f(x) = 0 ou f(x) < ε
+        if abs(fx_proximo) < tol:
+            print(f"\n CONVERGIU: f(x{t+1}) = {fx_proximo:.8f} < ε")
+            return x_proximo, t + 1
+        
+        x = x_proximo
+    
+    print(f"\n  t > tmax: {tmax} iterações")
+    return x, tmax
+
+def main():
+    """PROGRAMA PRINCIPAL - QUESTÃO 1"""
+    print("=" * 60)
+    print("QUESTÃO 1 - CÁLCULO DE Qc - COMPENSAÇÃO REATIVA")
+    print(" ")
+    print("=" * 60)
+    
+    # Equação: 0,160·Qs² + 78,44·Qs + 491,98 = 0
+    print("\nEquação: 0,160·Qs² + 78,44·Qs + 491,98 = 0")
+    
+    Ql = 50.0  # MVAr
+    tol = 1e-5
+    tmax = 100
+    
+    print("\n--- Busca no intervalo -1000 < Qs < -200 ---")
+    Qs1, iter1 = newton_raphson(xi=-500, tol=tol, tmax=tmax)
+    Qc1 = Qs1 - Ql
+    
+    print("\n--- Busca no intervalo -20 < Qs < 0 ---")
+    Qs2, iter2 = newton_raphson(xi=-10, tol=tol, tmax=tmax)
+    Qc2 = Qs2 - Ql
+    
+    print("\n" + "=" * 60)
+    print("RESULTADOS:")
+    print("=" * 60)
+    
+    print(f"\nRaiz 1: Qs = {Qs1:.6f} MVAr")
+    print(f"Qc = Qs - Ql = {Qc1:.6f} MVAr")
+    print(f"Iterações: {iter1}")
+    print(f"Verificação: f(Qs) = {f(Qs1):.10f}")
+    
+    print(f"\nRaiz 2: Qs = {Qs2:.6f} MVAr")
+    print(f"Qc = Qs - Ql = {Qc2:.6f} MVAr")
+    print(f"Iterações: {iter2}")
+    print(f"Verificação: f(Qs) = {f(Qs2):.10f}")
+    
+    # Análise de engenharia
+    print("\n" + "=" * 60)
+    print("ANÁLISE DE ENGENHARIA:")
+    print("=" * 60)
+    
+    if Qc1 < 0:
+        print(f"\n SOLUÇÃO CORRETA: Raiz 1")
+        print(f"Qc = {Qc1:.4f} MVAr (capacitivo)")
+        print(f"Compensador fornece {abs(Qc1):.2f} MVAr")
+    else:
+        print(f"\n SOLUÇÃO CORRETA: Raiz 2") 
+        print(f"Qc = {Qc2:.4f} MVAr (capacitivo)")
+        print(f"Compensador fornece {abs(Qc2):.2f} MVAr")
+
+if __name__ == "__main__":
+    main()
